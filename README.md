@@ -13,7 +13,7 @@
 - Flask 1.1.1
 - PyMySQL 0.9.3
 - Jinja2 2.10.1
-- Bootstrap 3.3.7
+- Bootstrap 4.3
 <br>
 
 ## 하드웨어 환경
