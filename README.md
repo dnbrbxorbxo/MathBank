@@ -1,26 +1,19 @@
-# flask_webpage
-<br>
-
-## Bootstrap으로 짜여진 Flask 웹페이지에 DB(cafe24)를 연동하여 관리자 페이지를 구축하였습니다.(다른 프로젝트에 협업 중입니다.)
-<br>
+# MATH BANK
 <br>
 
 ## 개발 도구
-- Visual Studio Code 1.40
+- PyCharm
 <br>
 
 ## 개발 환경
 - Flask 1.1.1
-- PyMySQL 0.9.3
+- SQLITE 3
 - Jinja2 2.10.1
 - Bootstrap 4.3
 <br>
 
 ## 하드웨어 환경
-- i7-8700
-- Samsung DDR4-8G 21300
-- NVIDIA Geforce RTX 2080
-- Samsung SSD 860 EVO 250G
+- MAC OS
 <br>
 
 ## 실행 방법
