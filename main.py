@@ -1,6 +1,5 @@
 from application import app
 from flask import session
-import page.user_config as uconfig
 
 if __name__ == "__main__":
     app.debug=True
