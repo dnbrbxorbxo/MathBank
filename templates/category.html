@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
+  <title>메인페이지</title>
+  <meta content="" name="description">
+  <meta content="" name="keywords">
+
+  <!-- Favicons -->
+  <link href="static/img/favicon.png" rel="icon">
+  <link href="static/img/apple-touch-icon.png" rel="apple-touch-icon">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.gstatic.com" rel="preconnect">
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Nunito:300,300i,400,400i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i" rel="stylesheet">
+
+  <!-- Vendor CSS Files -->
+  <link href="static/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="static/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="static/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+  <link href="static/vendor/quill/quill.snow.css" rel="stylesheet">
+  <link href="static/vendor/quill/quill.bubble.css" rel="stylesheet">
+  <link href="static/vendor/remixicon/remixicon.css" rel="stylesheet">
+  <link href="static/vendor/simple-datatables/style.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqtree/1.6.1/jqtree.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jqtree/1.6.1/tree.jquery.js"></script>
+  <!-- Template Main CSS File -->
+  <link href="static/css/style.css" rel="stylesheet">
+        <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- jsTree CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/themes/default/style.min.css" />
+    <!-- jsTree JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js"></script>
+
+
+<script>
+$(document).ready(function() {
+    let papersData = []; // 전역 변수로 설정하여 어디서나 접근 가능하게 함
+
+    // 폼 제출 처리
+    $('#paper-form').on('submit', function(e) {
+        e.preventDefault();
+        var paperId = $('#paper-id').val();
+        var formData = {
+            category: $('#paper-category').is(':checked'),
+            parent_id: $('#paper-parent-id').val(),
+            title: $('#paper-title').val(),
+            description: $('#paper-description').val(),
+            difficulty: $('#paper-difficulty').val(),
+            question_type: $('#paper-question-type').val(),
+            options: $('#paper-options').val().split('\n'),
+            correct_answer: $('#paper-correct-answer').val(),
+            solution: $('#paper-solution').val(),
+            explanation_pdf: $('#paper-explanation-pdf').val()
+        };
+
+        var requestType = paperId ? 'POST' : 'POST';
+        var requestUrl = paperId ? '/paper/' + paperId : '/paper';
+
+        $.ajax({
+            type: requestType,
+            url: requestUrl,
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                alert('문제가 성공적으로 저장되었습니다.');
+                fetchPapers();
+            },
+            error: function(error) {
+                console.error('에러:', error);
+                alert('문제 저장에 실패했습니다.');
+            }
+        });
+    });
+
+    // 문제 목록 및 트리 갱신
+    function fetchPapers() {
+        $.ajax({
+            type: 'GET',
+            url: '/papers',
+            success: function(papers) {
+                papersData = papers; // 전역 변수에 저장
+                populatePaperTree(papers);
+                populateParentSelect(papers);
+            },
+            error: function(error) {
+                console.error('에러:', error);
+            }
+        });
+    }
+
+    // 트리 구조 채우기
+    function populatePaperTree(papers) {
+        var treeData = [{
+            'id': 'root',
+            'parent': '#',
+            'text': '문제 은행'
+        }];
+
+        papers.forEach(function(paper) {
+            treeData.push({
+                'id': paper.id,
+                'parent': paper.parent_id ? paper.parent_id : 'root',
+                'text': paper.title
+            });
+        });
+
+        $('#tree').jstree('destroy').empty(); // 트리 초기화
+        $('#tree').jstree({
+            'core': {
+                'data': treeData
+            }
+        });
+
+        // 트리 항목 클릭 시 이벤트 처리
+        $('#tree').on('select_node.jstree', function (e, data) {
+            var selectedId = data.node.id;
+            if (selectedId !== 'root') {
+                var selectedPaper = papersData.find(paper => paper.id == selectedId);
+                if (selectedPaper) {
+                    $('#paper-id').val(selectedPaper.id);
+                    $('#paper-category').prop('checked', selectedPaper.category);
+                    $('#paper-parent-id').val(selectedPaper.parent_id);
+                    $('#paper-title').val(selectedPaper.title);
+                    $('#paper-description').val(selectedPaper.description);
+                    $('#paper-difficulty').val(selectedPaper.difficulty);
+                    $('#paper-question-type').val(selectedPaper.question_type);
+                    $('#paper-options').val(selectedPaper.options.join('\n'));
+                    $('#paper-correct-answer').val(selectedPaper.correct_answer);
+                    $('#paper-solution').val(selectedPaper.solution);
+                    $('#paper-explanation-pdf').val(selectedPaper.explanation_pdf);
+                }
+            }
+        });
+    }
+
+    // 부모 카테고리 선택 박스 채우기
+    function populateParentSelect(papers) {
+        var $parentSelect = $('#paper-parent-id');
+        $parentSelect.empty().append('<option value="">None</option>');
+        papers.forEach(function(paper) {
+            $parentSelect.append($('<option>', {
+                value: paper.id,
+                text: paper.title
+            }));
+        });
+    }
+
+    // 문제 삭제
+    $(document).on('click', '.delete-paper', function() {
+        var paperId = $(this).data('id');
+        $.ajax({
+            type: 'POST',
+            url: '/paper/' + paperId + '/delete',
+            success: function(response) {
+                alert('문제가 성공적으로 삭제되었습니다.');
+                fetchPapers();
+            },
+            error: function(error) {
+                console.error('에러:', error);
+                alert('문제 삭제에 실패했습니다.');
+            }
+        });
+    });
+
+    // 문제 업데이트
+    $('#update-paper-form').on('submit', function(e) {
+        e.preventDefault();
+        var paperId = $('#paper-id').val();
+        var formData = {
+            category: $('#paper-category').is(':checked'),
+            parent_id: $('#paper-parent-id').val(),
+            title: $('#paper-title').val(),
+            description: $('#paper-description').val(),
+            difficulty: $('#paper-difficulty').val(),
+            question_type: $('#paper-question-type').val(),
+            options: $('#paper-options').val().split('\n'),
+            correct_answer: $('#paper-correct-answer').val(),
+            solution: $('#paper-solution').val(),
+            explanation_pdf: $('#paper-explanation-pdf').val()
+        };
+
+        $.ajax({
+            type: 'POST',
+            url: '/paper/' + paperId,
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                alert('문제가 성공적으로 업데이트되었습니다.');
+                fetchPapers();
+            },
+            error: function(error) {
+                console.error('에러:', error);
+                alert('문제 업데이트에 실패했습니다.');
+            }
+        });
+    });
+
+    fetchPapers();
+});
+</script>
+
+    <style>
+        #tree {
+            margin-top: 20px;
+        }
+        .form-container {
+            margin-top: 20px;
+        }
+        .jqtree-title-folder::before {
+            content: "📁 ";
+        }
+        .jqtree-title-file::before {
+            content: "📄 ";
+        }
+        .edit, .delete {
+            margin-left: 10px;
+            cursor: pointer;
+            color: blue;
+        }
+    </style>
+
+</head>
+
+<body>
+
+  <!-- ======= 탑 Header ======= -->
+  <header id="header" class="header fixed-top d-flex align-items-center">
+
+    <div class="d-flex align-items-center justify-content-between">
+      <a href="/main" class="logo d-flex align-items-center">
+        <img src="static/img/logo.png" alt="">
+        <span class="d-none d-lg-block">문제은행</span>
+      </a>
+      <i class="bi bi-list toggle-sidebar-btn"></i>
+    </div><!-- End Logo -->
+
+
+    <nav class="header-nav ms-auto">
+      <ul class="d-flex align-items-center">
+
+        <li class="nav-item dropdown pe-3">
+
+          <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown">
+            <img src="static/img/userimg.png" alt="Profile" class="rounded-circle">
+            <span class="d-none d-md-block dropdown-toggle ps-2">{{ user.name }}</span>
+          </a><!-- End Profile Iamge Icon -->
+
+          <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
+            <li class="dropdown-header">
+              <h6>{{ user.name }}</h6>
+              <span>{{ user.school }}</span>
+            </li>
+            <li>
+              <hr class="dropdown-divider">
+            </li>
+
+            <li>
+              <a class="dropdown-item d-flex align-items-center" href="users-profile.html">
+                <i class="bi bi-person"></i>
+                <span>마이페이지</span>
+              </a>
+            </li>
+            <li>
+              <hr class="dropdown-divider">
+            </li>
+
+
+            <li>
+              <hr class="dropdown-divider">
+            </li>
+
+            <li>
+              <a class="dropdown-item d-flex align-items-center" href="/logout">
+                <i class="bi bi-box-arrow-right"></i>
+                <span>로그아웃</span>
+              </a>
+            </li>
+
+          </ul><!-- End Profile Dropdown Items -->
+        </li><!-- End Profile Nav -->
+
+      </ul>
+    </nav><!-- End Icons Navigation -->
+
+  </header><!-- End Header -->
+
+  <!-- ======= 메뉴 정보 ======= -->
+  <aside id="sidebar" class="sidebar">
+
+    <ul class="sidebar-nav" id="sidebar-nav">
+
+      <li class="nav-item">
+        <a class="nav-link" href="/main">
+          <i class="bi bi-grid"></i>
+          <span>메인</span>
+        </a>
+      </li>
+
+      <li class="nav-heading">학생 메뉴</li>
+
+      <li class="nav-item">
+        <a class="nav-link collapsed" href="/main">
+          <i class="bi bi-person"></i>
+          <span>나의 학습 정보</span>
+        </a>
+      </li><!-- End Profile Page Nav -->
+
+      <li class="nav-item">
+        <a class="nav-link collapsed" href="/main">
+          <i class="bi bi-card-list"></i>
+          <span>학습하기</span>
+        </a>
+      </li><!-- End Register Page Nav -->
+
+      <li class="nav-heading">관리자 메뉴</li>
+        <li class="nav-item">
+            <a class="nav-link collapsed" href="/main">
+                <i class="bi bi-gem"></i>
+                <span>학습지 관리</span>
+            </a>
+        </li><!-- End Register Page Nav -->
+        <li class="nav-item">
+            <a class="nav-link " href="/category">
+             <i class="bi bi-menu-button-wide"></i>
+              <span>학습 문제 관리</span>
+            </a>
+        </li><!-- End Register Page Nav -->
+        <li class="nav-item">
+            <a class="nav-link collapsed" href="/main">
+              <i class="bi bi-journal-text"></i>
+              <span>학습 통계 정보</span>
+            </a>
+          </li><!-- End Register Page Nav -->
+
+        <li class="nav-item">
+            <a class="nav-link collapsed" href="/userlist">
+              <i class="bi bi-journal-text"></i>
+              <span>사용자 관리</span>
+            </a>
+          </li><!-- End Register Page Nav -->
+
+
+    </ul>
+
+  </aside><!-- End Sidebar-->
+
+  <main id="main" class="main">
+
+    <div class="pagetitle">
+      <h1>학습문제 관리</h1>
+      <nav>
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="index.html">홈</a></li>
+          <li class="breadcrumb-item active">학습문제 관리</li>
+        </ol>
+      </nav>
+    </div><!-- End Page Title -->
+
+    <section class="section dashboard">
+      <div class="row">
+        <div class="col-lg-6">
+
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">학습문제 트리</h5>
+
+                 <div id="tree"></div>
+
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+             <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">학습 문제 설정</h5>
+
+            <div class="form-container">
+                <form id="paper-form">
+                    <input type="hidden" name="id" id="paper-id">
+                    <div class="row mb-3">
+                      <label for="inputText" class="col-sm-2 col-form-label">카테고리</label>
+                      <div class="col-sm-10">
+                         <input type="checkbox" name="category" class="form-check-input"  id="paper-category"></label>
+                      </div>
+                    </div>
+
+                    <div class="row mb-3">
+                      <label for="inputText" class="col-sm-2 col-form-label">부모 카테고리</label>
+                      <div class="col-sm-10">
+
+                        <select name="parent_id" id="paper-parent-id" class="form-select">
+                            <option value="">None</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="row mb-3">
+                      <label for="inputText" class="col-sm-2 col-form-label">제목</label>
+                      <div class="col-sm-10">
+                         <input type="text" name="title" class="form-control" id="paper-title">
+                      </div>
+                    </div>
+
+
+                    <div class="row mb-3">
+                      <label for="inputText" class="col-sm-2 col-form-label">설명</label>
+                      <div class="col-sm-10">
+                          <textarea name="description" class="form-control" id="paper-description"></textarea>
+                      </div>
+                    </div>
+
+                    <div class="row mb-3">
+                      <label for="inputText" class="col-sm-2 col-form-label">난이도</label>
+                      <div class="col-sm-10">
+                          <select name="difficulty" class="form-select" id="paper-difficulty">
+                            <option value="상">상</option>
+                            <option value="중">중</option>
+                            <option value="하">하</option>
+                        </select>
+                      </div>
+                    </div>
+
+
+                    <div class="row mb-3">
+                      <label for="inputText" class="col-sm-2 col-form-label">문제 형식</label>
+                      <div class="col-sm-10">
+                        <select name="question_type" class="form-select" id="paper-question-type">
+                            <option value="객관식">객관식</option>
+                            <option value="주관식">주관식</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="row mb-3">
+                      <label for="inputText" class="col-sm-2 col-form-label">옵션</label>
+                      <div class="col-sm-10">
+                        <textarea name="options" class="form-select" id="paper-options"></textarea>
+                      </div>
+                    </div>
+
+                    <div class="row mb-3">
+                      <label for="inputText" class="col-sm-2 col-form-label">정답</label>
+                      <div class="col-sm-10">
+                       <input type="text" name="correct_answer" class="form-control" id="paper-correct-answer">
+                      </div>
+                    </div>
+
+                    <div class="row mb-3">
+                      <label for="inputText" class="col-sm-2 col-form-label">해설지</label>
+                      <div class="col-sm-10">
+                       <textarea name="solution" class="form-control" id="paper-solution"></textarea>
+                      </div>
+                    </div>
+
+                    <div class="row mb-3">
+                      <label for="inputText" class="col-sm-2 col-form-label">문제 파일 업로드</label>
+                      <div class="col-sm-10">
+                       <input type="text" class="form-control" name="explanation_pdf" id="paper-explanation-pdf">
+                      </div>
+                    </div>
+
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%">저장</button>
+                </form>
+            </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main><!-- End #main -->
+
+  <!-- ======= Footer ======= -->
+  <footer id="footer" class="footer">
+    <div class="copyright">
+      &copy; Powery by <strong><span>장현우</span></strong>. All Rights Reserved
+    </div>
+  </footer><!-- End Footer -->
+
+  <a href="#" class="back-to-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+
+  <!-- Vendor JS Files -->
+  <script src="static/vendor/apexcharts/apexcharts.min.js"></script>
+  <script src="static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="static/vendor/chart.js/chart.umd.js"></script>
+  <script src="static/vendor/echarts/echarts.min.js"></script>
+  <script src="static/vendor/quill/quill.js"></script>
+  <script src="static/vendor/simple-datatables/simple-datatables.js"></script>
+  <script src="static/vendor/tinymce/tinymce.min.js"></script>
+  <script src="static/vendor/php-email-form/validate.js"></script>
+
+  <!-- Template Main JS File -->
+  <script src="static/js/main.js"></script>
+
+</body>
+
+</html>

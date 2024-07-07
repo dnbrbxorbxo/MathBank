@@ -2,7 +2,7 @@ import os
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import User, db
+from models import User, Paper
 import logging
 
 app = Flask(__name__)
@@ -19,8 +19,6 @@ def home():
         return redirect(url_for('login'))
     else:
         return redirect(url_for('main'))
-
-
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -112,6 +110,73 @@ def userlist():
     userlist = User.select()
     return render_template('userlist.html', userlist=userlist, user=current_user)
 
+
+@app.route('/category')
+def category():
+    if 'user_id' in session:
+        current_user = User.get(User.id == session['user_id'])
+    else:
+        current_user = None
+
+    return render_template('category.html', user=current_user)
+
+@app.route('/paper', methods=['POST'])
+def create_paper():
+    data = request.json
+    parent_id = data.get('parent_id')
+    parent = Paper.get(Paper.id == parent_id) if parent_id else None
+
+    print(data)
+
+    Paper.create(
+        category=data.get('category') == 'true',
+        title=data.get('title'),
+        description=data.get('description'),
+        difficulty=data.get('difficulty'),
+        question_type=data.get('question_type'),
+        options=data.get('options'),
+        correct_answer=data.get('correct_answer'),
+        answer=data.get('answer'),
+        solution=data.get('solution'),
+        explanation_pdf=data.get('explanation_pdf'),
+        explanation_image=data.get('explanation_image'),
+        explanation_video_link=data.get('explanation_video_link'),
+        parent=parent
+    )
+    return redirect(url_for('get_papers'))
+
+@app.route('/paper/<int:paper_id>', methods=['POST'])
+def update_paper(paper_id):
+    data = request.json
+    parent_id = data.get('parent_id')
+    parent = Paper.get(Paper.id == parent_id) if parent_id else None
+    paper = Paper.get(Paper.id == paper_id)
+    paper.category = data.get('category') == 'true'
+    paper.title = data.get('title')
+    paper.description = data.get('description')
+    paper.difficulty = data.get('difficulty')
+    paper.question_type = data.get('question_type')
+    paper.options = data.get('options')
+    paper.correct_answer = data.get('correct_answer')
+    paper.answer = data.get('answer')
+    paper.solution = data.get('solution')
+    paper.explanation_pdf = data.get('explanation_pdf')
+    paper.explanation_image = data.get('explanation_image')
+    paper.explanation_video_link = data.get('explanation_video_link')
+    paper.parent = parent
+    paper.save()
+    return redirect(url_for('get_papers'))
+
+@app.route('/paper/<int:paper_id>/delete', methods=['POST'])
+def delete_paper(paper_id):
+    paper = Paper.get(Paper.id == paper_id)
+    paper.delete_instance(recursive=True)
+    return redirect(url_for('get_papers'))
+
+@app.route('/papers', methods=['GET'])
+def get_papers():
+    papers = Paper.select().dicts()
+    return jsonify(list(papers))
 
 @app.route('/change_password', methods=['POST'])
 def change_password():
