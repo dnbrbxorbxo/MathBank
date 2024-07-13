@@ -1,7 +1,10 @@
 import os
+from datetime import timedelta
 
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+
 from models import User, Paper
 import logging
 
@@ -9,16 +12,33 @@ app = Flask(__name__)
 app.secret_key = os.urandom(24)
 app.config['SESSION_TYPE'] = 'filesystem'
 
+app.config['UPLOAD_FOLDER'] = 'PaperFile/'
+
+# Ensure the upload folder exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
 # 디버깅을 위한 로그 설정
 logging.basicConfig(level=logging.DEBUG)
 
+app.permanent_session_lifetime = timedelta(minutes=30)
+
+@app.route('/DownloadPaper/<filename>')
+def download_file(filename):
+    return send_from_directory('PaperFile', filename)
 
 @app.route('/')
 def home():
-    if 'user_id' not in session:
+    try:
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        else:
+            return redirect(url_for('main'))
+    except KeyError as e:
+        print(f"Session Key Error: {e}")
+        session.clear()
         return redirect(url_for('login'))
-    else:
-        return redirect(url_for('main'))
+    except Exception as e:
+        print(f"Unexpected Error: {e}")
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -120,58 +140,40 @@ def category():
 
     return render_template('category.html', user=current_user)
 
-@app.route('/paper', methods=['POST'])
-def create_paper():
-    data = request.json
-    parent_id = data.get('parent_id')
-    parent = Paper.get(Paper.id == parent_id) if parent_id else None
+@app.route('/save-paper', methods=['POST'])
+def save_paper():
+    data = request.form
+    file_question = request.files.get('question_file')
+    file_explanation = request.files.get('explanation_file')
 
-    print(data)
+    if 'id' in data and data['id']:
+        paper = Paper.get_by_id(data['id'])
+    else:
+        paper = Paper()
 
-    Paper.create(
-        category=data.get('category') == 'true',
-        title=data.get('title'),
-        description=data.get('description'),
-        difficulty=data.get('difficulty'),
-        question_type=data.get('question_type'),
-        options=data.get('options'),
-        correct_answer=data.get('correct_answer'),
-        answer=data.get('answer'),
-        solution=data.get('solution'),
-        explanation_pdf=data.get('explanation_pdf'),
-        explanation_image=data.get('explanation_image'),
-        explanation_video_link=data.get('explanation_video_link'),
-        parent=parent
-    )
-    return redirect(url_for('get_papers'))
+    paper.category = data['category']
+    paper.title = data['title']
+    paper.difficulty = data['difficulty']
+    paper.question_type = data['question_type']
+    paper.correct_answer = data['correct_answer']
+    paper.description = data['description']
+    paper.options = data['options']
+    paper.parent_id = data['parent_id']
 
-@app.route('/paper/<int:paper_id>', methods=['POST'])
-def update_paper(paper_id):
-    data = request.json
-    parent_id = data.get('parent_id')
-    parent = Paper.get(Paper.id == parent_id) if parent_id else None
-    paper = Paper.get(Paper.id == paper_id)
-    paper.category = data.get('category') == 'true'
-    paper.title = data.get('title')
-    paper.description = data.get('description')
-    paper.difficulty = data.get('difficulty')
-    paper.question_type = data.get('question_type')
-    paper.options = data.get('options')
-    paper.correct_answer = data.get('correct_answer')
-    paper.answer = data.get('answer')
-    paper.solution = data.get('solution')
-    paper.explanation_pdf = data.get('explanation_pdf')
-    paper.explanation_image = data.get('explanation_image')
-    paper.explanation_video_link = data.get('explanation_video_link')
-    paper.parent = parent
+    if file_question:
+        filename_question = secure_filename(file_question.filename)
+        file_question.save(os.path.join(app.config['UPLOAD_FOLDER'], filename_question))
+        paper.solution = filename_question
+
+    if file_explanation:
+        filename_explanation = secure_filename(file_explanation.filename)
+        file_explanation.save(os.path.join(app.config['UPLOAD_FOLDER'], filename_explanation))
+        paper.explanation_pdf = filename_explanation
+        paper.explanation_image = filename_explanation
+
     paper.save()
-    return redirect(url_for('get_papers'))
 
-@app.route('/paper/<int:paper_id>/delete', methods=['POST'])
-def delete_paper(paper_id):
-    paper = Paper.get(Paper.id == paper_id)
-    paper.delete_instance(recursive=True)
-    return redirect(url_for('get_papers'))
+    return jsonify({'status': 'success'})
 
 @app.route('/papers', methods=['GET'])
 def get_papers():

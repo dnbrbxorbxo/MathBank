@@ -36,7 +36,12 @@ class Paper(BaseModel):
 # 데이터베이스 초기화
 db.connect()
 
-# 기존 테이블을 삭제합니다. (안전하게 사용하려면 주석 처리)
-db.drop_tables([User, Paper], safe=True)
-# 새 테이블을 생성합니다.
-db.create_tables([User, Paper], safe=True)
+def initialize_db():
+    print(User.table_exists())
+    if not User.table_exists():
+        db.create_tables([User], safe=True)
+    if not Paper.table_exists():
+        db.create_tables([Paper], safe=True)
+
+
+
