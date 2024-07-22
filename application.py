@@ -141,6 +141,15 @@ def category():
     return render_template('category.html', user=current_user)
 
 
+@app.route('/worksheet')
+def worksheet():
+    if 'user_id' in session:
+        current_user = User.get(User.id == session['user_id'])
+    else:
+        current_user = None
+
+    return render_template('worksheet.html', user=current_user)
+
 
 @app.route('/save-paper', methods=['POST'])
 def save_paper():

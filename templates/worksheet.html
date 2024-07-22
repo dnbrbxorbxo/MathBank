@@ -98,7 +98,7 @@
             let papersData = []; // 전역 변수로 설정하여 어디서나 접근 가능하게 함
 
             $('#options-container').hide();
-             // 에디터 설정
+            // 에디터 설정
             var quill = new Quill('.quill-editor-full', {
                 theme: 'snow'
             });
@@ -141,17 +141,15 @@
                 }];
 
                 papers.forEach(function (paper) {
-                    if(!paper.parent){
-                        paper.parent  = "root";
+                    if (!paper.parent) {
+                        paper.parent = "root";
                     }
                     paper.text = paper.title;
                     console.log(paper.category);
                     if (paper.category === true) {
                         paper.type = 'folder';  // Specify this as a folder
-                    } else {
-                        paper.type = 'file';  // Specify this as a file
+                        treeData.push(paper);
                     }
-                    treeData.push(paper);
                 });
 
                 console.log(treeData);
@@ -162,49 +160,49 @@
                         'data': treeData,
                     },
                     'types': {
-                            'file': {
-                                'icon': "jqtree-title-file"
-                            },
-                            'folder': {
-                                'icon': "jqtree-title-folder"
-                            }
+                        'file': {
+                            'icon': "jqtree-title-file"
                         },
+                        'folder': {
+                            'icon': "jqtree-title-folder"
+                        }
+                    },
                     'plugins': ['types']
                 }).bind("loaded.jstree", function (event, data) {
                     data.instance.open_all();  // 트리 초기화 시 모든 노드를 열기
                 });
 
                 // 트리 항목 클릭 시 이벤트 처리
-                 $('#tree').on('select_node.jstree', function (e, data) {
-                var selectedId = data.node.id;
-                if (selectedId !== 'root') {
-                    var selectedPaper = papersData.find(paper => paper.id == selectedId);
-                    if (selectedPaper) {
-                        console.log(selectedPaper)
-                        $('#paper-id').val(selectedPaper.id);
-                        console.log(selectedPaper.category);
-                        if(selectedPaper.category){
-                            $('#paper-category').prop('checked', true);
-                        }else{
-                            $('#paper-category').prop('checked', false);
+                $('#tree').on('select_node.jstree', function (e, data) {
+                    var selectedId = data.node.id;
+                    if (selectedId !== 'root') {
+                        var selectedPaper = papersData.find(paper => paper.id == selectedId);
+                        if (selectedPaper) {
+                            console.log(selectedPaper)
+                            $('#paper-id').val(selectedPaper.id);
+                            console.log(selectedPaper.category);
+                            if (selectedPaper.category) {
+                                $('#paper-category').prop('checked', true);
+                            } else {
+                                $('#paper-category').prop('checked', false);
+                            }
+                            $('#paper-parent-id').val(selectedPaper.parent);
+                            $('#paper-title').val(selectedPaper.title);
+
+                            quill.root.innerHTML = selectedPaper.description;
+
+                            $('#paper-difficulty').val(selectedPaper.difficulty);
+                            $('#paper-question-type').val(selectedPaper.question_type);
+                            $('#paper-correct-answer').val(selectedPaper.correct_answer);
+
+                            $('#question_file_down').text(selectedPaper.solution + "[미리보기]");
+                            $('#question_file_down').attr("href", "/DownloadPaper/" + selectedPaper.solution);
+
+                            $('#explanation_file_down').text(selectedPaper.solution + "[미리보기]");
+                            $('#explanation_file_down').attr("href", "/DownloadPaper/" + selectedPaper.explanation_pdf);
                         }
-                        $('#paper-parent-id').val(selectedPaper.parent);
-                        $('#paper-title').val(selectedPaper.title);
-
-                        quill.root.innerHTML = selectedPaper.description;
-
-                        $('#paper-difficulty').val(selectedPaper.difficulty);
-                        $('#paper-question-type').val(selectedPaper.question_type);
-                        $('#paper-correct-answer').val(selectedPaper.correct_answer);
-
-                        $('#question_file_down').text(selectedPaper.solution+"[미리보기]");
-                        $('#question_file_down').attr( "href" , "/DownloadPaper/"+selectedPaper.solution);
-
-                        $('#explanation_file_down').text(selectedPaper.solution+"[미리보기]");
-                        $('#explanation_file_down').attr("href" , "/DownloadPaper/"+selectedPaper.explanation_pdf);
                     }
-                }
-            });
+                });
             }
 
             // 부모 카테고리 선택 박스 채우기
@@ -236,7 +234,7 @@
                 });
             });
 
-            $("#clear").on("click" , function(){
+            $("#clear").on("click", function () {
                 $('#paper-form input').val("");
 
                 quill.root.innerHTML = "";
@@ -246,17 +244,17 @@
                 $('#paper-correct-answer').val("");
 
                 $('#question_file_down').text("");
-                $('#question_file_down').attr( "href" , "#");
+                $('#question_file_down').attr("href", "#");
 
                 $('#explanation_file_down').text("");
-                $('#explanation_file_down').attr( "href" , "#");
+                $('#explanation_file_down').attr("href", "#");
 
 
                 fetchPapers();
             });
 
             // 문제 업데이트
-            $('#paper-form').submit(function(event) {
+            $('#paper-form').submit(function (event) {
                 event.preventDefault();
 
                 var formData = new FormData(this);
@@ -268,10 +266,10 @@
                     $('#option4').val(),
                     $('#option5').val()
                 ]));
-                if($("#paper-category").prop("checked")){
-                    formData.append("category" ,"1")
-                }else{
-                    formData.append("category" ,"0")
+                if ($("#paper-category").prop("checked")) {
+                    formData.append("category", "1")
+                } else {
+                    formData.append("category", "0")
                 }
 
 
@@ -282,11 +280,11 @@
                     processData: false,
                     contentType: false,
 
-                    success: function(response) {
+                    success: function (response) {
                         alert('문제 저장에 성공하였습니다.');
                         fetchPapers();
                     },
-                    error: function(error) {
+                    error: function (error) {
                         console.error('저장 실패 :', error);
                         alert('저장 실패');
                     }
@@ -393,13 +391,13 @@
 
         <li class="nav-heading">관리자 메뉴</li>
         <li class="nav-item">
-            <a class="nav-link collapsed" href="/worksheet">
+            <a class="nav-link " href="/worksheet">
                 <i class="bi bi-gem"></i>
                 <span>학습지 관리</span>
             </a>
         </li><!-- End Register Page Nav -->
         <li class="nav-item">
-            <a class="nav-link " href="/category">
+            <a class="nav-link collapsed" href="/category">
                 <i class="bi bi-menu-button-wide"></i>
                 <span>학습 문제 관리</span>
             </a>
@@ -430,187 +428,171 @@
         <nav>
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="index.html">홈</a></li>
-                <li class="breadcrumb-item active">학습문제 관리</li>
+                <li class="breadcrumb-item active">학습지 관리</li>
             </ol>
         </nav>
     </div><!-- End Page Title -->
+    <!-- Large Modal -->
 
     <section class="section dashboard">
         <div class="row">
-            <div class="col-lg-4">
+            <div class="col-lg-6">
 
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="card-title">학습문제 트리</h5>
+                        <h5 class="card-title">학습지 리스트
 
-                        <div id="tree" style="height: 700px; overflow: auto"></div>
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" style="float: right;"
+                                    data-bs-target="#WorkSheetModal">
+                                학습지 설정
+                            </button>
+                        </h5>
+                        <!-- Table with stripped rows -->
+                        <table class="table datatable">
+                            <thead>
+                            <tr>
+                                <th style="text-align: center;">순서</th>
+                                <th style="text-align: center;">학습지명</th>
+                                <th style="text-align: center;">문제수</th>
+                                <th style="text-align: center;">생성일</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for user in userlist %}
+                                <tr>
+                                    <td style="text-align: center;">{{ user.id }}</td>
+                                    <td style="text-align: center;">{{ user.username }}</td>
+                                    <td style="text-align: center;">{{ user.username }}</td>
+                                    <td style="text-align: center;">{{ user.name }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        <!-- End Table with stripped rows -->
 
                     </div>
                 </div>
             </div>
-            <div class="col-lg-8">
+            <div class="col-lg-6">
+
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="card-title">학습 문제 설정</h5>
+                        <h5 class="card-title">학습지 미리보기</h5>
 
-                        <div class="form-container">
-                            <form id="paper-form">
-                                <input type="hidden" name="id" id="paper-id">
-                                <div class="row mb-3">
-                                    <label for="inputText" class="col-sm-2 col-form-label">카테고리</label>
-                                    <div class="col-sm-10">
-                                        <div class="form-check form-switch" style="margin-top: 5px;">
-                                            <input class="form-check-input" type="checkbox" id = "paper-category">
-                                            <label class="form-check-label" style="font-size: 10px;" for="flexSwitchCheckDefault">문제를 등록하실 경우에는
-                                                OFF해주세요.</label>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="row mb-3">
-                                    <label for="inputText" class="col-sm-2 col-form-label">부모 카테고리</label>
-                                    <div class="col-sm-10">
-
-                                        <select name="parent_id" id="paper-parent-id" class="form-select">
-                                            <option value="">None</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div class="row mb-3">
-                                    <label for="inputText" class="col-sm-2 col-form-label">제목</label>
-                                    <div class="col-sm-10">
-                                        <input type="text" name="title" class="form-control" id="paper-title">
-                                    </div>
-                                </div>
-
-
-                                <div class="row mb-3">
-                                    <label for="inputText" class="col-sm-2 col-form-label">난이도</label>
-                                    <div class="col-sm-4">
-                                        <select name="difficulty" class="form-select" id="paper-difficulty">
-                                            <option value="상">상</option>
-                                            <option value="중">중</option>
-                                            <option value="하">하</option>
-                                        </select>
-                                    </div>
-                                    <label for="inputText" class="col-sm-2 col-form-label">문제 형식</label>
-                                    <div class="col-sm-4">
-                                        <select name="question_type" class="form-select" id="paper-question-type">
-                                            <option value="객관식">객관식</option>
-                                            <option value="주관식">주관식</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div id="options-container">
-                                    <div class="row mb-3">
-                                        <div class="col-sm-2"></div>
-                                        <label for="option1" class="col-sm-2 col-form-label">객관식 1번</label>
-                                        <div class="col-sm-8">
-                                            <input type="text" name="option1" class="form-control" id="option1">
-                                        </div>
-                                    </div>
-
-                                    <div class="row mb-3">
-                                        <div class="col-sm-2"></div>
-                                        <label for="option2" class="col-sm-2 col-form-label">객관식 2번</label>
-                                        <div class="col-sm-8">
-                                            <input type="text" name="option2" class="form-control" id="option2">
-                                        </div>
-
-                                    </div>
-
-                                    <div class="row mb-3">
-                                        <div class="col-sm-2"></div>
-                                        <label for="option3" class="col-sm-2 col-form-label">객관식 3번</label>
-                                        <div class="col-sm-8">
-                                            <input type="text" name="option3" class="form-control" id="option3">
-                                        </div>
-
-                                    </div>
-
-                                    <div class="row mb-3">
-                                        <div class="col-sm-2"></div>
-                                        <label for="option4" class="col-sm-2 col-form-label">객관식 4번</label>
-                                        <div class="col-sm-8">
-                                            <input type="text" name="option4" class="form-control" id="option4">
-                                        </div>
-
-                                    </div>
-
-                                    <div class="row mb-3">
-                                        <div class="col-sm-2"></div>
-                                        <label for="option5" class="col-sm-2 col-form-label">객관식 5번</label>
-                                        <div class="col-sm-8">
-                                            <input type="text" name="option5" class="form-control" id="option5">
-                                        </div>
-
-                                    </div>
-                                </div>
-
-                                <div class="row mb-3">
-                                    <label for="inputText" class="col-sm-2 col-form-label">정답</label>
-                                    <div class="col-sm-10">
-                                        <input type="text" name="correct_answer" class="form-control"
-                                               id="paper-correct-answer">
-                                    </div>
-                                </div>
-
-                                <div class="row mb-3">
-                                    <label for="inputText" class="col-sm-2 col-form-label">문제</label>
-                                    <div class="col-sm-10">
-                                        <input class="form-control" type="file" id="question_file"  name ="question_file">
-                                    </div>
-
-                                    <div class="col-sm-12">
-                                        <a id = "question_file_down" style="float: right; font-size: 10px" target="_blank"></a>
-                                    </div>
-                                </div>
-
-                                <div class="row mb-3">
-                                    <label for="inputText" class="col-sm-2 col-form-label">해설지</label>
-                                    <div class="col-sm-10">
-                                        <input class="form-control" type="file" id="explanation_file" name ="explanation_file">
-                                    </div>
-
-                                    <div class="col-sm-12">
-                                        <a  id = "explanation_file_down"style="float: right; font-size: 10px" target="_blank"></a>
-                                    </div>
-                                </div>
-
-
-                                <div class="row mb-3">
-                                    <div class="col-sm-12">
-
-                                        <!-- Quill Editor Full -->
-                                        <div class="quill-editor-full" style="height: 500px;" id = "paper-description">
-                                            <p>학습 상세 정보를 입력해주세요.</p>
-                                        </div>
-                                        <!-- End Quill Editor Full -->
-                                    </div>
-                                </div>
-
-                                <div class="row mb-3">
-                                    <div class="col-sm-8">
-                                        <button type="submit" class="btn btn-primary" style="width: 100%">저장</button>
-                                    </div>
-
-                                    <div class="col-sm-4">
-                                        <button type="button" id = "clear" class="btn btn-secondary" style="width: 100%">초기화</button>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
 
                     </div>
                 </div>
             </div>
+
         </div>
     </section>
 
 </main><!-- End #main -->
 
+
+<div class="modal fade" id="WorkSheetModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">학습지 설정</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+
+                    <div class="col-lg-6">
+
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">학습문제 트리</h5>
+
+                                <div id="tree" style="height: 700px; overflow: auto"></div>
+
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">학습지 설정</h5>
+
+                                <div class="form-container">
+                                    <form id="paper-form">
+                                        <input type="hidden" name="id" id="paper-id">
+
+                                        <div class="row mb-3">
+                                            <label for="inputText" class="col-sm-2 col-form-label">학습지명</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" name="title" class="form-control" id="paper-title">
+                                            </div>
+                                        </div>
+
+                                        <div class="row mb-3">
+                                            <label for="option1" class="col-sm-2 col-form-label">상 </label>
+                                            <div class="col-sm-10">
+                                                <input type="text" name="option1" class="form-control" id="option1"
+                                                       placeholder="난이도(상) 문제 갯수">
+                                            </div>
+                                        </div>
+
+                                        <div class="row mb-3">
+                                            <label for="option2" class="col-sm-2 col-form-label">중</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" name="option1" class="form-control" id="option1"
+                                                       placeholder="난이도(중) 문제 갯수">
+                                            </div>
+
+                                        </div>
+
+                                        <div class="row mb-3">
+                                            <label for="option3" class="col-sm-2 col-form-label">하</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" name="option3" class="form-control" id="option3"
+                                                       placeholder="난이도(하) 문제 갯수">
+                                            </div>
+
+                                        </div>
+
+
+                                        <div class="row mb-3">
+                                            <div class="col-sm-12">
+
+                                                <!-- Quill Editor Full -->
+                                                <div class="quill-editor-full" style="height: 300px;"
+                                                     id="paper-description">
+                                                    <p>학습지 상세 정보를 입력해주세요.</p>
+                                                </div>
+                                                <!-- End Quill Editor Full -->
+                                            </div>
+                                        </div>
+
+                                        <div class="row mb-3">
+                                            <div class="col-sm-8">
+                                                <button type="submit" class="btn btn-primary" style="width: 100%">저장
+                                                </button>
+                                            </div>
+
+                                            <div class="col-sm-4">
+                                                <button type="button" id="clear" class="btn btn-secondary"
+                                                        style="width: 100%">
+                                                    초기화
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+            </div>
+        </div>
+    </div>
+</div><!-- End Large Modal-->
 <!-- ======= Footer ======= -->
 <footer id="footer" class="footer">
     <div class="copyright">

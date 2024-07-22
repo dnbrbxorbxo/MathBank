@@ -1,3 +1,5 @@
+import json
+
 from peewee import *
 
 # SQLite 데이터베이스 연결
@@ -33,6 +35,30 @@ class Paper(BaseModel):
     explanation_video_link = CharField(null=True)
     parent = ForeignKeyField('self', null=True, backref='children')
 
+class Worksheet(BaseModel):
+    title = CharField()
+    description = TextField()
+    created_at = DateTimeField(constraints=[SQL('DEFAULT CURRENT_TIMESTAMP')])
+    papers_json = TextField(default='[]')  # JSON string to store related papers
+
+    def add_paper(self, paper):
+        papers = json.loads(self.papers_json)
+        papers.append(paper.id)
+        self.papers_json = json.dumps(papers)
+        self.save()
+
+    def remove_paper(self, paper):
+        papers = json.loads(self.papers_json)
+        if paper.id in papers:
+            papers.remove(paper.id)
+            self.papers_json = json.dumps(papers)
+            self.save()
+
+    def get_papers(self):
+        paper_ids = json.loads(self.papers_json)
+        return Paper.select().where(Paper.id.in_(paper_ids))
+
+
 # 데이터베이스 초기화
 db.connect()
 
@@ -42,6 +68,9 @@ def initialize_db():
         db.create_tables([User], safe=True)
     if not Paper.table_exists():
         db.create_tables([Paper], safe=True)
+
+    if not Worksheet.table_exists():
+        db.create_tables([Worksheet], safe=True)
 
 
 
