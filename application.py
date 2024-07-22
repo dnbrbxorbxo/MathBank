@@ -140,6 +140,8 @@ def category():
 
     return render_template('category.html', user=current_user)
 
+
+
 @app.route('/save-paper', methods=['POST'])
 def save_paper():
     data = request.form
@@ -151,7 +153,7 @@ def save_paper():
     else:
         paper = Paper()
 
-    paper.category = data['category']
+    paper.category = (data['category'] == 1)
     paper.title = data['title']
     paper.difficulty = data['difficulty']
     paper.question_type = data['question_type']

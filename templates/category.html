@@ -145,6 +145,12 @@
                         paper.parent  = "root";
                     }
                     paper.text = paper.title;
+                    console.log(paper.category);
+                    if (paper.category === true) {
+                        paper.type = 'folder';  // Specify this as a folder
+                    } else {
+                        paper.type = 'file';  // Specify this as a file
+                    }
                     treeData.push(paper);
                 });
 
@@ -153,8 +159,17 @@
                 $('#tree').jstree('destroy').empty(); // 트리 초기화
                 $('#tree').jstree({
                     'core': {
-                        'data': treeData
-                    }
+                        'data': treeData,
+                    },
+                    'types': {
+                            'file': {
+                                'icon': "jqtree-title-file"
+                            },
+                            'folder': {
+                                'icon': "jqtree-title-folder"
+                            }
+                        },
+                    'plugins': ['types']
                 }).bind("loaded.jstree", function (event, data) {
                     data.instance.open_all();  // 트리 초기화 시 모든 노드를 열기
                 });
@@ -219,6 +234,25 @@
                         alert('문제 삭제에 실패했습니다.');
                     }
                 });
+            });
+
+            $("#clear").on("click" , function(){
+                $('#paper-form input').val("");
+
+                quill.root.innerHTML = "";
+
+                $('#paper-difficulty').val("");
+                $('#paper-question-type').val("");
+                $('#paper-correct-answer').val("");
+
+                $('#question_file_down').text("");
+                $('#question_file_down').attr( "href" , "#");
+
+                $('#explanation_file_down').text("");
+                $('#explanation_file_down').attr( "href" , "#");
+
+
+                fetchPapers();
             });
 
             // 문제 업데이트
@@ -558,8 +592,12 @@
                                 </div>
 
                                 <div class="row mb-3">
-                                    <div class="col-sm-12">
+                                    <div class="col-sm-8">
                                         <button type="submit" class="btn btn-primary" style="width: 100%">저장</button>
+                                    </div>
+
+                                    <div class="col-sm-4">
+                                        <button type="button" id = "clear" class="btn btn-secondary" style="width: 100%">초기화</button>
                                     </div>
                                 </div>
                             </form>
