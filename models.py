@@ -40,23 +40,11 @@ class Worksheet(BaseModel):
     description = TextField()
     created_at = DateTimeField(constraints=[SQL('DEFAULT CURRENT_TIMESTAMP')])
     papers_json = TextField(default='[]')  # JSON string to store related papers
+    pdf_file = TextField()
 
-    def add_paper(self, paper):
-        papers = json.loads(self.papers_json)
-        papers.append(paper.id)
-        self.papers_json = json.dumps(papers)
-        self.save()
-
-    def remove_paper(self, paper):
-        papers = json.loads(self.papers_json)
-        if paper.id in papers:
-            papers.remove(paper.id)
-            self.papers_json = json.dumps(papers)
-            self.save()
-
-    def get_papers(self):
-        paper_ids = json.loads(self.papers_json)
-        return Paper.select().where(Paper.id.in_(paper_ids))
+    option1 = IntegerField()
+    option2 = IntegerField()
+    option3 = IntegerField()
 
 
 # 데이터베이스 초기화

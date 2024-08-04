@@ -1,11 +1,13 @@
+import json
 import os
+import random
 from datetime import timedelta
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
-from models import User, Paper
+from models import User, Paper , Worksheet
 import logging
 
 app = Flask(__name__)
@@ -147,8 +149,9 @@ def worksheet():
         current_user = User.get(User.id == session['user_id'])
     else:
         current_user = None
+    worksheet = Worksheet.select().order_by(Worksheet.created_at.desc())
 
-    return render_template('worksheet.html', user=current_user)
+    return render_template('worksheet.html', user=current_user , worksheet = worksheet)
 
 
 @app.route('/save-paper', methods=['POST'])
@@ -185,6 +188,166 @@ def save_paper():
     paper.save()
 
     return jsonify({'status': 'success'})
+
+
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from PIL import Image
+import os
+
+import random
+
+def create_worksheet(title , worksheet_paper_list, rows=2, cols=2):
+    """
+    Create an HTML string from a list of images with dynamic rows and columns.
+
+    :param worksheet_paper_list: List of dictionaries containing the image paths.
+    :param rows: Number of rows in the grid.
+    :param cols: Number of columns in the grid.
+    :return: HTML string.
+    """
+    # Shuffle the paper list to randomize order
+    random.shuffle(worksheet_paper_list)
+
+    total_items = len(worksheet_paper_list)
+    items_per_page = rows * cols
+    total_pages = (total_items // items_per_page) + (1 if total_items % items_per_page != 0 else 0)
+
+    # Correctly format the HTML string using triple-quoted strings
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>title</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }}
+        .page {{
+            page-break-after: always;
+            margin-bottom: 50px;
+        }}
+        .grid-container {{
+            display: grid;
+            grid-template-columns: repeat({cols}, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }}
+        .question {{
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }}
+        .question img {{
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 10px;
+        }}
+        .question-number {{
+            font-weight: bold;
+            margin-top: 10px;
+        }}
+    </style>
+</head>
+<body>
+    <h1>{title}</h1>
+"""
+    print(worksheet_paper_list)
+    # Add images to the grid, page by page
+    for page in range(total_pages):
+        html_content += '<div class="page"><div class="grid-container">'
+        for i in range(items_per_page):
+            index = page * items_per_page + i
+            if index < total_items:
+                paper = worksheet_paper_list[index]  # Access the Paper instance
+                img_path = paper.solution  # Use dot notation to access attributes
+                html_content += f"""
+                <div class="question">
+                    <img src="/DownloadPaper/{img_path}" alt="Question Image">
+                    <div class="question-number">문제 {index + 1}</div>
+                </div>
+                """
+        html_content += '</div></div>'
+
+    html_content += """
+</body>
+</html>
+"""
+
+    # Debugging: Print HTML content to ensure it is generated correctly
+    print("Generated HTML content:\n", html_content)
+
+    return html_content
+
+
+@app.route('/save-worksheet', methods=['POST'])
+def save_worksheet():
+    try:
+        # Parse form data
+        title = request.form.get('title')
+        description = request.form.get('description')
+        option1 = int(request.form.get('option1', 0))
+        option2 = int(request.form.get('option2', 0))
+        option3 = int(request.form.get('option3', 0))
+        papers_json = request.form.get('papers_json')
+
+
+        # Parse JSON data into an array
+        try:
+            papers = json.loads(papers_json)
+        except json.JSONDecodeError:
+            return jsonify({'status': 'error', 'message': 'Invalid JSON data for papers'}), 400
+
+        worksheet_paper_list = []
+
+        # Filter and collect papers based on difficulty, category, and parent_id
+        for difficulty, count in [("상", option1), ("중", option2), ("하", option3)]:
+            # Extract parent_ids from papers
+            parent_ids = [p['id'] for p in papers]
+
+            # Fetch papers for the given difficulty, category N, and parent IDs
+            matching_papers = Paper.select().where(
+                (Paper.parent_id.in_(parent_ids)) &  # Use parent_id for filtering
+                (Paper.difficulty == difficulty) &  # Use correct difficulty filtering
+                (Paper.category == False)  # Assuming N is represented as False
+            ).limit(count)
+
+            # Append the matched papers to the worksheet_paper_list
+            worksheet_paper_list.extend(matching_papers)
+
+            # Print the titles of the matched papers for debugging
+            print(f"Difficulty Level {difficulty}:")
+            for paper in matching_papers:
+                print(f"- {paper.title}")
+
+        # Shuffle the worksheet_paper_list to randomize the order
+        random.shuffle(worksheet_paper_list)  # Correct use of random.shuffle
+
+        html_content = create_worksheet(title , worksheet_paper_list, rows=2, cols=2)
+
+
+
+        # Create a new Worksheet instance
+        worksheet = Worksheet.create(
+            title=title,
+            description=description,
+            option1=option1,
+            option2=option2,
+            option3=option3,
+            papers_json=papers_json,  # Store as JSON string
+            pdf_file = html_content
+        )
+
+        return jsonify({'status': 'success', 'message': 'Worksheet saved successfully', 'worksheet_id': worksheet.id , "worksheet_form" : html_content})
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/papers', methods=['GET'])
 def get_papers():

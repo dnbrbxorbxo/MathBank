@@ -167,7 +167,11 @@
                             'icon': "jqtree-title-folder"
                         }
                     },
-                    'plugins': ['types']
+                    'plugins': ['types' , 'checkbox'],
+                    'checkbox': {
+                        'keep_selected_style': false,
+                        'tie_selection': false // 선택과 체크박스를 별개로 유지
+                    }
                 }).bind("loaded.jstree", function (event, data) {
                     data.instance.open_all();  // 트리 초기화 시 모든 노드를 열기
                 });
@@ -217,23 +221,6 @@
                 });
             }
 
-            // 문제 삭제
-            $(document).on('click', '.delete-paper', function () {
-                var paperId = $(this).data('id');
-                $.ajax({
-                    type: 'POST',
-                    url: '/paper/' + paperId + '/delete',
-                    success: function (response) {
-                        alert('문제가 성공적으로 삭제되었습니다.');
-                        fetchPapers();
-                    },
-                    error: function (error) {
-                        console.error('에러:', error);
-                        alert('문제 삭제에 실패했습니다.');
-                    }
-                });
-            });
-
             $("#clear").on("click", function () {
                 $('#paper-form input').val("");
 
@@ -253,36 +240,38 @@
                 fetchPapers();
             });
 
-            // 문제 업데이트
-            $('#paper-form').submit(function (event) {
-                event.preventDefault();
+            $('#worksheet-form').on('submit', function(event) {
+                event.preventDefault(); // Prevent the default form submission
 
+                // Create a FormData object from the form
                 var formData = new FormData(this);
+
+                // Include the description content from the Quill editor
                 formData.append('description', quill.root.innerHTML);
-                formData.append('options', JSON.stringify([
-                    $('#option1').val(),
-                    $('#option2').val(),
-                    $('#option3').val(),
-                    $('#option4').val(),
-                    $('#option5').val()
-                ]));
-                if ($("#paper-category").prop("checked")) {
-                    formData.append("category", "1")
-                } else {
-                    formData.append("category", "0")
-                }
+                var checkedNodes = $('#tree').jstree('get_checked', true); // Get checked nodes with full objects
+                var checkedData = checkedNodes.map(function(node) {
+                    return {
+                        id: node.id,
+                        text: node.text,
+                        parent: node.parent
+                    };
+                });
+                var checkedDataJson = JSON.stringify(checkedData);
+
+                formData.append('papers_json', checkedDataJson);
 
 
-                $.ajax({
-                    url: '/save-paper',
+                 $.ajax({
+                    url: '/save-worksheet',
                     method: 'POST',
                     data: formData,
                     processData: false,
                     contentType: false,
 
                     success: function (response) {
-                        alert('문제 저장에 성공하였습니다.');
-                        fetchPapers();
+                        alert('학습지 저장 및 생성에 성공하였습니다.');
+                        location.reload();
+
                     },
                     error: function (error) {
                         console.error('저장 실패 :', error);
@@ -292,7 +281,22 @@
             });
 
             fetchPapers();
+
         });
+
+        function rowclick(ele){
+            let worksheet = $(ele).attr("data-worksheet");
+            console.log(worksheet);
+
+
+            var iframe = document.getElementById('WorksheetViewer');
+            var doc = iframe.contentDocument || iframe.contentWindow.document;
+
+            // Write the HTML content to the iframe's document
+            doc.open();
+            doc.write(worksheet);
+            doc.close();
+        }
     </script>
 
 
@@ -458,12 +462,13 @@
                             </tr>
                             </thead>
                             <tbody>
-                            {% for user in userlist %}
-                                <tr>
-                                    <td style="text-align: center;">{{ user.id }}</td>
-                                    <td style="text-align: center;">{{ user.username }}</td>
-                                    <td style="text-align: center;">{{ user.username }}</td>
-                                    <td style="text-align: center;">{{ user.name }}</td>
+                            {% for work in worksheet %}
+                                <tr onclick = "rowclick(this)" style="cursor: pointer;" data-worksheet = '{{work.pdf_file}}'>
+                                    <td style="text-align: center;">{{ work.id }}</td>
+                                    <td style="text-align: center;">{{ work.title }}</td>
+                                    <td style="text-align: center;">{{ work.option1}} + {{ work.option2 }} + {{ work.option3 }}</td>
+                                    <td style="text-align: center;">{{ work.created_at }}</td>
+
                                 </tr>
                             {% endfor %}
                             </tbody>
@@ -479,6 +484,7 @@
                     <div class="card-body">
                         <h5 class="card-title">학습지 미리보기</h5>
 
+                        <iframe id = "WorksheetViewer" style="width: 100%; height: 800px;"></iframe>
 
                     </div>
                 </div>
@@ -517,7 +523,7 @@
                                 <h5 class="card-title">학습지 설정</h5>
 
                                 <div class="form-container">
-                                    <form id="paper-form">
+                                    <form id="worksheet-form">
                                         <input type="hidden" name="id" id="paper-id">
 
                                         <div class="row mb-3">
@@ -538,7 +544,7 @@
                                         <div class="row mb-3">
                                             <label for="option2" class="col-sm-2 col-form-label">중</label>
                                             <div class="col-sm-10">
-                                                <input type="text" name="option1" class="form-control" id="option1"
+                                                <input type="text" name="option2" class="form-control" id="option2"
                                                        placeholder="난이도(중) 문제 갯수">
                                             </div>
 
