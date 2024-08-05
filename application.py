@@ -199,89 +199,96 @@ import random
 
 def create_worksheet(title , worksheet_paper_list, rows=2, cols=2):
     """
-    Create an HTML string from a list of images with dynamic rows and columns.
+        Create an HTML string for a worksheet from a list of Paper objects with images.
 
-    :param worksheet_paper_list: List of dictionaries containing the image paths.
-    :param rows: Number of rows in the grid.
-    :param cols: Number of columns in the grid.
-    :return: HTML string.
-    """
-    # Shuffle the paper list to randomize order
-    random.shuffle(worksheet_paper_list)
+        :param worksheet_paper_list: List of Paper objects containing question images.
+        :param rows: Number of rows in the grid.
+        :param cols: Number of columns in the grid.
+        :return: HTML string representing the worksheet.
+        """
+    random.shuffle(worksheet_paper_list)  # Randomize the order of questions
 
     total_items = len(worksheet_paper_list)
     items_per_page = rows * cols
     total_pages = (total_items // items_per_page) + (1 if total_items % items_per_page != 0 else 0)
 
-    # Correctly format the HTML string using triple-quoted strings
     html_content = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>title</title>
-    <style>
-        body {{
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f4f4f4;
-        }}
-        .page {{
-            page-break-after: always;
-            margin-bottom: 50px;
-        }}
-        .grid-container {{
-            display: grid;
-            grid-template-columns: repeat({cols}, 1fr);
-            gap: 20px;
-            margin-bottom: 30px;
-        }}
-        .question {{
-            background-color: white;
-            padding: 10px;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            text-align: center;
-        }}
-        .question img {{
-            max-width: 100%;
-            height: auto;
-            margin-bottom: 10px;
-        }}
-        .question-number {{
-            font-weight: bold;
-            margin-top: 10px;
-        }}
-    </style>
-</head>
-<body>
-    <h1>{title}</h1>
-"""
-    print(worksheet_paper_list)
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{title}</title>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background-color: #fff;
+            }}
+            .page {{
+                page-break-after: always;
+                margin-bottom: 50px;
+                padding: 20px;
+                border: 1px solid #000;
+                background-color: #fff;
+            }}
+            .header {{
+                text-align: center;
+                margin-bottom: 20px;
+            }}
+            .grid-container {{
+                display: grid;
+                grid-template-columns: repeat({cols}, 1fr);
+                grid-template-rows: repeat({rows}, 1fr);
+                gap: 20px;
+                margin-bottom: 30px;
+                height: calc(100vh - 40px);
+            }}
+            .question {{
+                background-color: white;
+                padding: 10px;
+                border-radius: 5px;
+                text-align: center;
+            }}
+            .question img {{
+                max-width: 100%;
+                height: auto;
+                margin-bottom: 10px;
+            }}
+            .question-number {{
+                font-weight: bold;
+                margin-top: 10px;
+            }}
+        </style>
+    </head>
+    <body>
+    """
+
     # Add images to the grid, page by page
     for page in range(total_pages):
-        html_content += '<div class="page"><div class="grid-container">'
+        html_content += f'<div class="page"><div class="header">' \
+                        f'<h2>{title}</h2>' \
+                        f'<h5>페이지 {page + 1}</h5></div>' \
+                        f'<div class="grid-container" style = "border-top: 1px solid black;">'
+
         for i in range(items_per_page):
             index = page * items_per_page + i
             if index < total_items:
-                paper = worksheet_paper_list[index]  # Access the Paper instance
-                img_path = paper.solution  # Use dot notation to access attributes
+                paper = worksheet_paper_list[index]
+                img_path = paper.solution  # Access the image path from the Paper object
+                difficulty = paper.difficulty  # Access the image path from the Paper object
                 html_content += f"""
-                <div class="question">
-                    <img src="/DownloadPaper/{img_path}" alt="Question Image">
-                    <div class="question-number">문제 {index + 1}</div>
-                </div>
-                """
+                    <div class="question">
+                        <div class="question-number">문제 {index + 1} 번 ( 난이도 {difficulty} )</div>
+                        <img src="/DownloadPaper/{img_path}" alt="Question Image">
+                    </div>
+                    """
         html_content += '</div></div>'
 
     html_content += """
-</body>
-</html>
-"""
-
-    # Debugging: Print HTML content to ensure it is generated correctly
-    print("Generated HTML content:\n", html_content)
+    </body>
+    </html>
+    """
 
     return html_content
 
