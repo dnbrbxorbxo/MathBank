@@ -1,6 +1,6 @@
 import json
-
 from peewee import *
+import DefaultCategory
 
 # SQLite 데이터베이스 연결
 db = SqliteDatabase('MathBank.db')
@@ -56,7 +56,7 @@ def initialize_db():
         db.create_tables([User], safe=True)
     if not Paper.table_exists():
         db.create_tables([Paper], safe=True)
-
+        DefaultCategory.SetDefaultCategory(Paper)
     if not Worksheet.table_exists():
         db.create_tables([Worksheet], safe=True)
 

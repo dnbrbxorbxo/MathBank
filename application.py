@@ -9,6 +9,8 @@ from werkzeug.utils import secure_filename
 
 from models import User, Paper , Worksheet
 import logging
+import pyqrcode
+import png
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -27,6 +29,13 @@ app.permanent_session_lifetime = timedelta(minutes=30)
 @app.route('/DownloadPaper/<filename>')
 def download_file(filename):
     return send_from_directory('PaperFile', filename)
+
+
+def generate_qr_code(data, filepath):
+    qr = pyqrcode.create(data)
+    # Save the QR code as a PNG file
+    qr.png(filepath, scale=10)
+    print(f"QR code saved as {filepath}")
 
 @app.route('/')
 def home():
@@ -167,6 +176,7 @@ def save_paper():
 
     paper.category = (data['category'] == 1)
     paper.title = data['title']
+    paper.explanation_video_link = data['explanation_video_link']
     paper.difficulty = data['difficulty']
     paper.question_type = data['question_type']
     paper.correct_answer = data['correct_answer']
@@ -197,15 +207,17 @@ import os
 
 import random
 
-def create_worksheet(title , worksheet_paper_list, rows=2, cols=2):
-    """
-        Create an HTML string for a worksheet from a list of Paper objects with images.
 
-        :param worksheet_paper_list: List of Paper objects containing question images.
-        :param rows: Number of rows in the grid.
-        :param cols: Number of columns in the grid.
-        :return: HTML string representing the worksheet.
-        """
+def create_worksheet(title, worksheet_paper_list, rows=2, cols=2):
+    """
+    Create an HTML string for a worksheet from a list of Paper objects with images.
+
+    :param title: The title of the worksheet.
+    :param worksheet_paper_list: List of Paper objects containing question images.
+    :param rows: Number of rows in the grid.
+    :param cols: Number of columns in the grid.
+    :return: HTML string representing the worksheet.
+    """
     random.shuffle(worksheet_paper_list)  # Randomize the order of questions
 
     total_items = len(worksheet_paper_list)
@@ -213,84 +225,109 @@ def create_worksheet(title , worksheet_paper_list, rows=2, cols=2):
     total_pages = (total_items // items_per_page) + (1 if total_items % items_per_page != 0 else 0)
 
     html_content = f"""<!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>{title}</title>
-        <style>
-            body {{
-                font-family: Arial, sans-serif;
-                margin: 0;
-                padding: 20px;
-                background-color: #fff;
-            }}
-            .page {{
-                page-break-after: always;
-                margin-bottom: 50px;
-                padding: 20px;
-                border: 1px solid #000;
-                background-color: #fff;
-            }}
-            .header {{
-                text-align: center;
-                margin-bottom: 20px;
-            }}
-            .grid-container {{
-                display: grid;
-                grid-template-columns: repeat({cols}, 1fr);
-                grid-template-rows: repeat({rows}, 1fr);
-                gap: 20px;
-                margin-bottom: 30px;
-                height: calc(100vh - 40px);
-            }}
-            .question {{
-                background-color: white;
-                padding: 10px;
-                border-radius: 5px;
-                text-align: center;
-            }}
-            .question img {{
-                max-width: 100%;
-                height: auto;
-                margin-bottom: 10px;
-            }}
-            .question-number {{
-                font-weight: bold;
-                margin-top: 10px;
-            }}
-        </style>
-    </head>
-    <body>
-    """
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #fff;
+        }}
+        .page {{
+            page-break-after: always;
+            padding: 20px;
+            border: 1px solid #000;
+            background-color: #fff;
+        }}
+        .header {{
+            text-align: center;
+            margin-bottom: 20px;
+        }}
+        .grid-container {{
+            display: grid;
+            grid-template-columns: repeat({cols}, 1fr);
+            grid-template-rows: repeat({rows}, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+            height: 100vh;
+            width: 100%;
+            box-sizing: border-box;
+        }}
+        .question {{
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }}
+        .question img {{
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            margin-bottom: 10px;
+        }}
+        .question-number {{
+            font-weight: bold;
+            margin-top: 10px;
+        }}
+        .qr-code {{
+            max-width: 50px;
+            max-height: 50px;
+            margin-top: 5px;
+        }}
+    </style>
+</head>
+<body>
+    <h1 class="header">{title}</h1>
+"""
 
     # Add images to the grid, page by page
     for page in range(total_pages):
-        html_content += f'<div class="page"><div class="header">' \
-                        f'<h2>{title}</h2>' \
-                        f'<h5>페이지 {page + 1}</h5></div>' \
-                        f'<div class="grid-container" style = "border-top: 1px solid black;">'
-
+        html_content += '<div class="page"><div class="grid-container">'
         for i in range(items_per_page):
             index = page * items_per_page + i
             if index < total_items:
                 paper = worksheet_paper_list[index]
                 img_path = paper.solution  # Access the image path from the Paper object
-                difficulty = paper.difficulty  # Access the image path from the Paper object
+                difficulty = paper.difficulty
+                explanation_video_link = paper.explanation_video_link
+                paper_id = paper.id
+
+                # Generate QR code for the video link if available
+                qr_image = None
+                if explanation_video_link:
+                    qr_image = f'paper{paper_id}_qr_{index + 1}.png'
+                    qr_image_path = os.path.join(app.config['UPLOAD_FOLDER'], qr_image)
+                    generate_qr_code(explanation_video_link, qr_image_path)
+
+                # Add question and QR code to HTML
                 html_content += f"""
-                    <div class="question">
-                        <div class="question-number">문제 {index + 1} 번 ( 난이도 {difficulty} )</div>
-                        <img src="/DownloadPaper/{img_path}" alt="Question Image">
-                    </div>
+                <div class="question">
+                    <div class="question-number">문제 {index + 1} 번 ( 난이도 {difficulty} )</div>
+                    <img src="/DownloadPaper/{img_path}" alt="Question Image">
+                """
+                if qr_image:
+                    html_content += f"""
+                    <img src="/DownloadPaper/{qr_image}" alt="QR Code" style = 'width:100px;' class="qr-code">
                     """
+                html_content += "</div>"
+
         html_content += '</div></div>'
 
     html_content += """
-    </body>
-    </html>
-    """
+</body>
+</html>
+"""
 
     return html_content
+
 
 
 @app.route('/save-worksheet', methods=['POST'])
@@ -303,6 +340,8 @@ def save_worksheet():
         option2 = int(request.form.get('option2', 0))
         option3 = int(request.form.get('option3', 0))
         papers_json = request.form.get('papers_json')
+        worksheet_col = request.form.get("worksheet_col" , 1)
+        worksheet_row = request.form.get("worksheet_row" , 1)
 
 
         # Parse JSON data into an array
@@ -336,7 +375,7 @@ def save_worksheet():
         # Shuffle the worksheet_paper_list to randomize the order
         random.shuffle(worksheet_paper_list)  # Correct use of random.shuffle
 
-        html_content = create_worksheet(title , worksheet_paper_list, rows=2, cols=2)
+        html_content = create_worksheet(title , worksheet_paper_list, rows=int(worksheet_row), cols=int(worksheet_col))
 
 
 
