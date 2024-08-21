@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import random
 from datetime import timedelta
@@ -7,7 +8,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
-from models import User, Paper , Worksheet
+from models import User, Paper , Worksheet, Test
 import logging
 import pyqrcode
 import png
@@ -142,6 +143,64 @@ def userlist():
     return render_template('userlist.html', userlist=userlist, user=current_user)
 
 
+@app.route('/test')
+def test():
+    if 'user_id' in session:
+        current_user = User.get(User.id == session['user_id'])
+        print(current_user)
+    else:
+        current_user = None
+
+    print(current_user)
+
+    worksheet = Worksheet.select().where(Worksheet.target == current_user.user_class ).order_by(Worksheet.created_at.desc())
+
+    return render_template('test.html', user=current_user, worksheet=worksheet)
+
+
+@app.route('/save_test', methods=['GET', 'POST'])
+def save_test():
+    # 클라이언트로부터 POST 요청에서 데이터를 가져옵니다.
+    paper_id = request.form.get("paper")
+    worksheet_id = request.form.get("worksheet")
+    value = request.form.get("value")
+
+    # Paper 테이블에서 조건에 맞는 레코드를 선택합니다.
+    target_paper = Paper.get_or_none(
+        (Paper.id == paper_id) &  # parent_id가 주어진 paper와 일치
+        (Paper.category == False)  # category가 False인 항목 선택
+    )
+
+    if not target_paper:
+        return jsonify({'status': 'error', 'message': 'Target paper not found'}), 404
+
+    print(session)
+
+    # value와 target_paper의 answer 값을 비교하여 결과 설정
+    correct_value = 'Y' if value == target_paper.correct_answer else 'N'
+
+    # 기존의 Test 레코드가 존재하면 삭제
+    existing_test = Test.get_or_none(
+        (Test.paper == paper_id) &
+        (Test.worksheet == worksheet_id)
+    )
+    if existing_test:
+        existing_test.delete_instance()
+
+    current_user = User.get(User.id == session['user_id'])
+    # Test 테이블에 새로운 레코드를 추가합니다.
+    _test = Test.create(
+        paper=paper_id,          # 선택된 paper의 ID
+        worksheet=worksheet_id,  # 선택된 worksheet의 ID
+        value=value,             # 입력된 value 값
+        correct=correct_value,   # 정답 여부
+        user_id=current_user.username     # 필요에 따라 적절한 user_id 사용
+    )
+
+    # 결과를 JSON 형식으로 반환합니다.
+    return jsonify({'status': 'success', 'message': 'Test saved successfully'})
+
+
 @app.route('/category')
 def category():
     if 'user_id' in session:
@@ -206,9 +265,7 @@ from PIL import Image
 import os
 
 import random
-
-
-def create_worksheet(title, worksheet_paper_list, rows=2, cols=2):
+def create_worksheet(worksheet_idx , title, worksheet_paper_list, rows=1, cols=2):
     """
     Create an HTML string for a worksheet from a list of Paper objects with images.
 
@@ -218,11 +275,14 @@ def create_worksheet(title, worksheet_paper_list, rows=2, cols=2):
     :param cols: Number of columns in the grid.
     :return: HTML string representing the worksheet.
     """
+
     random.shuffle(worksheet_paper_list)  # Randomize the order of questions
 
     total_items = len(worksheet_paper_list)
     items_per_page = rows * cols
-    total_pages = (total_items // items_per_page) + (1 if total_items % items_per_page != 0 else 0)
+    total_pages = math.ceil(total_items / items_per_page)
+    print(total_items)
+    print(total_pages)
 
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
@@ -242,6 +302,8 @@ def create_worksheet(title, worksheet_paper_list, rows=2, cols=2):
             padding: 20px;
             border: 1px solid #000;
             background-color: #fff;
+            height: 100vh;
+            box-sizing: border-box;
         }}
         .header {{
             text-align: center;
@@ -252,24 +314,24 @@ def create_worksheet(title, worksheet_paper_list, rows=2, cols=2):
             grid-template-columns: repeat({cols}, 1fr);
             grid-template-rows: repeat({rows}, 1fr);
             gap: 20px;
-            margin-bottom: 30px;
-            height: 100vh;
-            width: 100%;
+            height: calc(100% - 40px); /* 40px header height */
             box-sizing: border-box;
         }}
         .question {{
             background-color: white;
             padding: 10px;
             border-radius: 5px;
-            text-align: center;
+            text-align: left;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            justify-content: space-between;
+            align-items: flex-start;
+            box-sizing: border-box;
+            position: relative;
         }}
         .question img {{
             max-width: 100%;
-            max-height: 100%;
+            max-height: 50%;
             object-fit: contain;
             margin-bottom: 10px;
         }}
@@ -278,10 +340,24 @@ def create_worksheet(title, worksheet_paper_list, rows=2, cols=2):
             margin-top: 10px;
         }}
         .qr-code {{
-            max-width: 50px;
-            max-height: 50px;
-            margin-top: 5px;
+            max-width: 50px !important;
+            max-height: 50px !important;
+            position: absolute;
+            bottom: 50px;
+            right: 10px;
         }}
+        .answer-input {{    
+            width: 100%;
+            /* padding: 5px; */
+            /* margin-top: 10px; */
+            /* margin: 10px; */
+            border: 1px solid #000;
+            border-radius: 3px;
+            height: 30px;
+            /* font-size: 16px; */
+            text-align: right;
+        }}
+        
     </style>
 </head>
 <body>
@@ -309,17 +385,31 @@ def create_worksheet(title, worksheet_paper_list, rows=2, cols=2):
 
                 # Add question and QR code to HTML
                 html_content += f"""
+               
                 <div class="question">
                     <div class="question-number">문제 {index + 1} 번 ( 난이도 {difficulty} )</div>
-                    <img src="/DownloadPaper/{img_path}" alt="Question Image">
+                     <div style = "width:100%; height:100%;">
+                    <img src="/DownloadPaper/{img_path}" style = "vertical-align:top;" alt="Question Image">
+                     </div>
                 """
                 if qr_image:
                     html_content += f"""
-                    <img src="/DownloadPaper/{qr_image}" alt="QR Code" style = 'width:100px;' class="qr-code">
+                    <img src="/DownloadPaper/{qr_image}" alt="QR Code" class="qr-code">
                     """
-                html_content += "</div>"
+                html_content += f"""
+                    <input type="text" class="answer-input" style = "display:none;" data-paper-idx = "{paper_id}" data-worksheet-idx = "{worksheet_idx}" placeholder="정답을 입력하세요">
+                </div>"""
 
-        html_content += '</div></div>'
+
+
+        # Add page number at the bottom
+        html_content += f"""
+                        </div>
+                        <div class="footer" style = "    font-size: 12px; text-align: center; margin-top: 20px;">
+                             {page + 1} / {total_pages}
+                        </div>
+                    </div>
+                    """
 
     html_content += """
 </body>
@@ -330,11 +420,13 @@ def create_worksheet(title, worksheet_paper_list, rows=2, cols=2):
 
 
 
+
 @app.route('/save-worksheet', methods=['POST'])
 def save_worksheet():
     try:
         # Parse form data
         title = request.form.get('title')
+        target = request.form.get('target')
         description = request.form.get('description')
         option1 = int(request.form.get('option1', 0))
         option2 = int(request.form.get('option2', 0))
@@ -352,48 +444,78 @@ def save_worksheet():
 
         worksheet_paper_list = []
 
-        # Filter and collect papers based on difficulty, category, and parent_id
-        for difficulty, count in [("상", option1), ("중", option2), ("하", option3)]:
-            # Extract parent_ids from papers
-            parent_ids = [p['id'] for p in papers]
+        # Extract parent_ids from papers
+        target_ids = [p['id'] for p in papers]
+        count = int(worksheet_col) * int(worksheet_row)
 
-            # Fetch papers for the given difficulty, category N, and parent IDs
-            matching_papers = Paper.select().where(
-                (Paper.parent_id.in_(parent_ids)) &  # Use parent_id for filtering
-                (Paper.difficulty == difficulty) &  # Use correct difficulty filtering
-                (Paper.category == False)  # Assuming N is represented as False
-            ).limit(count)
+        print(target_ids)
 
-            # Append the matched papers to the worksheet_paper_list
-            worksheet_paper_list.extend(matching_papers)
-
-            # Print the titles of the matched papers for debugging
-            print(f"Difficulty Level {difficulty}:")
-            for paper in matching_papers:
-                print(f"- {paper.title}")
-
-        # Shuffle the worksheet_paper_list to randomize the order
-        random.shuffle(worksheet_paper_list)  # Correct use of random.shuffle
-
-        html_content = create_worksheet(title , worksheet_paper_list, rows=int(worksheet_row), cols=int(worksheet_col))
-
-
-
-        # Create a new Worksheet instance
-        worksheet = Worksheet.create(
-            title=title,
-            description=description,
-            option1=option1,
-            option2=option2,
-            option3=option3,
-            papers_json=papers_json,  # Store as JSON string
-            pdf_file = html_content
+        # Fetch papers for the given difficulty, category N, and parent IDs
+        matching_papers = Paper.select().where(
+            (Paper.id.in_(target_ids)) &  # Use parent_id for filtering
+            (Paper.category == False)  # Assuming N is represented as False
         )
 
-        return jsonify({'status': 'success', 'message': 'Worksheet saved successfully', 'worksheet_id': worksheet.id , "worksheet_form" : html_content})
+        # Append the matched papers to the worksheet_paper_list
+        worksheet_paper_list.extend(matching_papers)
 
+        # 1. 데이터베이스에 새로운 Worksheet 인스턴스를 생성합니다.
+        if target == "" :
+            target = "전체"
+
+        _worksheet = Worksheet.create(
+            title=title,
+            description=description,
+            target=target,
+            option1=worksheet_row,
+            option2=worksheet_col,
+            option3=worksheet_col,
+            papers_json=papers_json,
+            pdf_file='업데이트'  # 처음엔 빈 값으로 설정
+        )
+
+        # 2. 생성된 인스턴스의 ID를 사용하여 HTML 콘텐츠 생성
+        worksheet_id = _worksheet.id
+        html_content = create_worksheet(worksheet_id, title, worksheet_paper_list, rows=int(worksheet_row), cols=int(worksheet_col))
+
+        # 3. 생성된 HTML 콘텐츠를 데이터베이스에 업데이트
+        query = Worksheet.update(pdf_file=html_content).where(Worksheet.id == worksheet_id)
+        query.execute()
+
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Worksheet created and updated successfully',
+            'worksheet_id': worksheet_id,
+            'worksheet_form': html_content
+        })
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/delete-worksheet', methods=['POST'])
+def delete_worksheet():
+    try:
+        # 요청에서 worksheetIdx를 가져옵니다.
+        worksheet_idx = request.form.get('worksheetIdx')
+
+        if worksheet_idx is None or worksheet_idx == "":
+            return jsonify({"error": "worksheetIdx가 제공되지 않았습니다."}), 400
+
+        # 데이터베이스에서 해당 worksheet을 조회합니다.
+        query = Worksheet.get_or_none(Worksheet.id == worksheet_idx)
+
+        if query is None:
+            return jsonify({"error": "해당 ID의 학습지가 존재하지 않습니다."}), 404
+
+        # 해당 worksheet을 삭제합니다.
+        query.delete_instance()
+
+        return jsonify({"success": True, "message": "학습지가 성공적으로 삭제되었습니다."}), 200
+
+    except Exception as e:
+        # 예외 처리
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/papers', methods=['GET'])
 def get_papers():
@@ -427,7 +549,6 @@ def toggle_approval():
         return jsonify({'approved': user.approved, 'message': '접근 권한 상태가 변경되었습니다.'})
     except User.DoesNotExist:
         return jsonify({'message': '사용자를 찾을 수 없습니다.'}), 404
-
 
 @app.route('/logout')
 def logout():

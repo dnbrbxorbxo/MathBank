@@ -94,6 +94,7 @@
     </style>
 
     <script>
+        let worksheetIdx = "";
         $(document).ready(function () {
             let papersData = []; // 전역 변수로 설정하여 어디서나 접근 가능하게 함
 
@@ -148,8 +149,9 @@
                     console.log(paper.category);
                     if (paper.category === true) {
                         paper.type = 'folder';  // Specify this as a folder
-                        treeData.push(paper);
+
                     }
+                    treeData.push(paper);
                 });
 
                 console.log(treeData);
@@ -207,6 +209,7 @@
                         }
                     }
                 });
+
             }
 
             // 부모 카테고리 선택 박스 채우기
@@ -282,10 +285,37 @@
 
             fetchPapers();
 
+
+            $("#deleteWorkSheet").on("click" , function () {
+                console.log(worksheetIdx);
+                if(worksheetIdx == ""){
+                    alert("선택된 학습지가 없습니다.");
+                }else{
+                    $.ajax({
+                        url: '/delete-worksheet',
+                        method: 'POST',
+                        data: {
+                            "worksheetIdx" : worksheetIdx
+                        },
+
+                        success: function (response) {
+                            alert('학습지 삭제에 성공하였습니다.');
+                            location.reload();
+
+                        },
+                        error: function (error) {
+                            console.error('삭제 실패 :', error);
+                            alert('저장 실패');
+                        }
+                    });
+                }
+            });
+
         });
 
         function rowclick(ele){
             let worksheet = $(ele).attr("data-worksheet");
+            worksheetIdx = $(ele).attr("data-worksheet-idx");
             console.log(worksheet);
 
 
@@ -387,7 +417,7 @@
         </li><!-- End Profile Page Nav -->
 
         <li class="nav-item">
-            <a class="nav-link collapsed" href="/main">
+            <a class="nav-link collapsed" href="/test">
                 <i class="bi bi-card-list"></i>
                 <span>학습하기</span>
             </a>
@@ -446,10 +476,15 @@
                     <div class="card-body">
                         <h5 class="card-title">학습지 리스트
 
+                            <button type="button" class="btn btn-danger"  style="float: right; margin-left:10px;" id = "deleteWorkSheet">
+                                학습지 삭제
+                            </button>
+
                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" style="float: right;"
                                     data-bs-target="#WorkSheetModal">
-                                학습지 설정
+                                학습지 추가
                             </button>
+
                         </h5>
                         <!-- Table with stripped rows -->
                         <table class="table datatable">
@@ -457,16 +492,18 @@
                             <tr>
                                 <th style="text-align: center;">순서</th>
                                 <th style="text-align: center;">학습지명</th>
+                                <th style="text-align: center;">대상</th>
                                 <th style="text-align: center;">문제수</th>
                                 <th style="text-align: center;">생성일</th>
                             </tr>
                             </thead>
                             <tbody>
                             {% for work in worksheet %}
-                                <tr onclick = "rowclick(this)" style="cursor: pointer;" data-worksheet = '{{work.pdf_file}}'>
+                                <tr onclick = "rowclick(this)" style="cursor: pointer;" data-worksheet = '{{work.pdf_file}}' data-worksheet-idx = '{{work.id}}'>
                                     <td style="text-align: center;">{{ work.id }}</td>
                                     <td style="text-align: center;">{{ work.title }}</td>
-                                    <td style="text-align: center;">{{ work.option1}} + {{ work.option2 }} + {{ work.option3 }}</td>
+                                    <td style="text-align: center;">{{ work.target }}</td>
+                                    <td style="text-align: center;">가로 : {{work.option1}} / 세로 : {{ work.option2 }}</td>
                                     <td style="text-align: center;">{{ work.created_at }}</td>
 
                                 </tr>
@@ -482,7 +519,11 @@
 
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="card-title">학습지 미리보기</h5>
+                        <h5 class="card-title">
+                            학습지 미리보기
+
+                        <button type="button" class="btn btn-info rounded-pill">PDF 다운로드</button>
+                        </h5>
 
                         <iframe id = "WorksheetViewer" style="width: 100%; height: 800px;"></iframe>
 
@@ -533,45 +574,35 @@
                                             </div>
                                         </div>
 
-                                        <div class="row mb-3">
-                                            <label for="option1" class="col-sm-2 col-form-label">상 </label>
-                                            <div class="col-sm-10">
-                                                <input type="text" name="option1" class="form-control" id="option1"
-                                                       placeholder="난이도(상) 문제 갯수">
-                                            </div>
-                                        </div>
-
-                                        <div class="row mb-3">
-                                            <label for="option2" class="col-sm-2 col-form-label">중</label>
-                                            <div class="col-sm-10">
-                                                <input type="text" name="option2" class="form-control" id="option2"
-                                                       placeholder="난이도(중) 문제 갯수">
-                                            </div>
-
-                                        </div>
-
-                                        <div class="row mb-3">
-                                            <label for="option3" class="col-sm-2 col-form-label">하</label>
-                                            <div class="col-sm-10">
-                                                <input type="text" name="option3" class="form-control" id="option3"
-                                                       placeholder="난이도(하) 문제 갯수">
-                                            </div>
-
-                                        </div>
 
                                         <div class="row mb-3">
                                             <label for="option3" class="col-sm-2 col-form-label">가로</label>
                                             <div class="col-sm-4">
-                                                <input type="text" name="worksheet_col" class="form-control" id="worksheet_col"
-                                                       placeholder="가로">
+                                                <select name="worksheet_col" class="form-select" id="worksheet_col" onchange="$('#worksheet_row').val('1')">
+                                                    <option value="1" selected>1</option>
+                                                    <option value="2">2</option>
+                                                    <option value="3">3</option>
+                                                    <option value="4">4</option>
+                                                </select>
                                             </div>
 
                                             <label for="option3" class="col-sm-2 col-form-label">세로</label>
                                             <div class="col-sm-4">
-                                                <input type="text" name="worksheet_row" class="form-control" id="worksheet_row"
-                                                       placeholder="세로">
+                                                <select name="worksheet_row" class="form-select" id="worksheet_row" onchange="$('#worksheet_col').val('1')">
+                                                    <option value="1" selected>1</option>
+                                                    <option value="2">2</option>
+                                                    <option value="3">3</option>
+                                                    <option value="4">4</option>
+                                                </select>
                                             </div>
 
+                                        </div>
+
+                                        <div class="row mb-3">
+                                            <label for="inputText" class="col-sm-2 col-form-label">학습대상</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" name="target" class="form-control" id="worksheet-target" placeholder="ex) 심화반 / 기초반 등">
+                                            </div>
                                         </div>
 
 
